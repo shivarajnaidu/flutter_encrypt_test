@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,6 +38,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
   double _downloadProgress = 0.0;
   bool _isDownloading = false;
+  List<File> _downloadedFiles = [];
 
   void _incrementCounter() {
     setState(() {
@@ -67,7 +70,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     final filePath =
-        '${downloadsDirectory!.path}/myvid.mp4'; // Adjust file name as needed
+        '${downloadsDirectory!.path}/myvid_${DateTime.now().millisecondsSinceEpoch}.mp4'; // Adjust file name as needed
     final file = File(filePath);
 
     final fileStream = file.openWrite();
@@ -87,6 +90,7 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           _isDownloading = false;
           _downloadProgress = 1.0;
+          _downloadedFiles.add(file);
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -103,6 +107,37 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       },
       cancelOnError: true,
+    );
+  }
+
+  Future<void> _listDownloadedFiles() async {
+    Directory? downloadsDirectory;
+
+    if (Platform.isAndroid) {
+      downloadsDirectory = await getExternalStorageDirectory();
+    } else {
+      downloadsDirectory = await getApplicationDocumentsDirectory();
+    }
+
+    final List<FileSystemEntity> files = downloadsDirectory!.listSync();
+    final List<File> videoFiles = files.whereType<File>().toList();
+
+    setState(() {
+      _downloadedFiles = videoFiles;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _listDownloadedFiles();
+  }
+
+  void _playVideo(File file) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => VideoPlayerScreen(file: file),
+      ),
     );
   }
 
@@ -134,6 +169,19 @@ class _MyHomePageState extends State<MyHomePage> {
                     onPressed: _downloadFile,
                     child: const Text('Download File'),
                   ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _downloadedFiles.length,
+                itemBuilder: (context, index) {
+                  final file = _downloadedFiles[index];
+                  return ListTile(
+                    title: Text(file.path.split('/').last),
+                    onTap: () => _playVideo(file),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -141,6 +189,64 @@ class _MyHomePageState extends State<MyHomePage> {
         onPressed: _incrementCounter,
         tooltip: 'Increment',
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class VideoPlayerScreen extends StatefulWidget {
+  final File file;
+
+  const VideoPlayerScreen({super.key, required this.file});
+
+  @override
+  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+}
+
+class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+  late VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(widget.file)
+      ..initialize().then((_) {
+        setState(() {});
+        _controller.play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Video Player'),
+      ),
+      body: Center(
+        child: _controller.value.isInitialized
+            ? AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              )
+            : const CircularProgressIndicator(),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          setState(() {
+            _controller.value.isPlaying
+                ? _controller.pause()
+                : _controller.play();
+          });
+        },
+        child: Icon(
+          _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+        ),
       ),
     );
   }
