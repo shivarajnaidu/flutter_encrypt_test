@@ -1,7 +1,10 @@
-// file_downloader.dart
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+import 'package:encrypt/encrypt.dart';
+import 'utils.dart';
 
 Future<File?> downloadFile(
   String url,
@@ -14,32 +17,37 @@ Future<File?> downloadFile(
     final contentLength = response.contentLength ?? 0;
     int bytesDownloaded = 0;
 
-    Directory? downloadsDirectory;
-
-    if (Platform.isAndroid) {
-      downloadsDirectory = await getExternalStorageDirectory();
-    } else {
-      downloadsDirectory = await getApplicationDocumentsDirectory();
-    }
+    Directory? downloadsDirectory = await getDownlaodsDirectory();
 
     final filePath =
         '${downloadsDirectory!.path}/myvid_${DateTime.now().millisecondsSinceEpoch}.mp4'; // Adjust file name as needed
     final file = File(filePath);
 
+    // Encryption setup
+    final encrypter = Encrypter(AES(mykey));
+
     final fileStream = file.openWrite();
     response.stream.listen(
       (chunk) {
         bytesDownloaded += chunk.length;
-        fileStream.add(chunk);
 
+        // Encrypt chunk
+        final encryptedChunk = encrypter.encryptBytes(Uint8List.fromList(chunk), iv: myIV);
+
+        // Write encrypted chunk to file
+        fileStream.add(encryptedChunk.bytes);
+        debugPrint("Downloading... $bytesDownloaded / $contentLength");
         onProgress(bytesDownloaded, contentLength);
       },
       onDone: () async {
         await fileStream.flush();
         await fileStream.close();
+        debugPrint("downlaod and encryption successful");
       },
       onError: (e) {
         fileStream.close();
+        debugPrint("failed to encrypt");
+        debugPrint(e.toString());
         return null;
       },
       cancelOnError: true,

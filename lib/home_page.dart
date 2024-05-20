@@ -1,9 +1,10 @@
 // home_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/utils.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'file_downloader.dart';
-import 'video_player_screen.dart';
+// import 'video_player_screen.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -32,8 +33,11 @@ class _MyHomePageState extends State<MyHomePage> {
       _downloadProgress = 0.0;
     });
 
+    const url1 =
+        'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    const url2 = 'https://samplelib.com/lib/preview/mp4/sample-5s.mp4';
     final file = await downloadFile(
-      'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      url1,
       (bytesDownloaded, totalBytes) {
         setState(() {
           _downloadProgress = bytesDownloaded / totalBytes;
@@ -85,12 +89,14 @@ class _MyHomePageState extends State<MyHomePage> {
     _listDownloadedFiles();
   }
 
-  void _playVideo(File file) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(file: file),
-      ),
-    );
+  void _playVideo(File file) async {
+    await decryptFile(file,
+        '${(await getDownlaodsDirectory())!.path}/myvid_decrypt${DateTime.now().millisecondsSinceEpoch}.mp4');
+    // Navigator.of(context).push(
+    //   MaterialPageRoute(
+    //     builder: (context) => VideoPlayerScreen(file: file),
+    //   ),
+    // );
   }
 
   @override
